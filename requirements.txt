@@ -1,6 +1,5 @@
 numpy
 pandas
-pulp
 pika
 python-dotenv
 requests
