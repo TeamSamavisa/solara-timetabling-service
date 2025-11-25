@@ -43,8 +43,7 @@ def parse_timetable_data(data: Dict[str, Any]) -> TimetableData:
                          "shift_id": 1, "student_count": 35}, ...],
         "class_allocations": [{"id": 1, "class_group_id": 1, "subject_id": 1, 
                               "teacher_id": 1, "duration": 2}, ...],
-        "teacher_schedules": {"1": [1, 2, 3, ...], "2": [4, 5, 6, ...]},
-        "subject_teachers": {"1": [1, 2], "2": [3]}
+        "teacher_schedules": {"1": [1, 2, 3, ...], "2": [4, 5, 6, ...]}
     }
     
     Returns:
@@ -115,10 +114,9 @@ def parse_timetable_data(data: Dict[str, Any]) -> TimetableData:
             course=courses[subject["course_id"]]
         )
     
-    # Parse Teachers (needs schedules and subjects)
+    # Parse Teachers (needs schedules)
     teachers = {}
     teacher_schedules_map = data.get("teacher_schedules", {})
-    subject_teachers_map = data.get("subject_teachers", {})
     
     for teacher in data.get("teachers", []):
         teacher_id = teacher["id"]
@@ -127,13 +125,15 @@ def parse_timetable_data(data: Dict[str, Any]) -> TimetableData:
         teacher_schedule_ids = teacher_schedules_map.get(str(teacher_id), [])
         teacher_schedule_objs = [schedules[sid] for sid in teacher_schedule_ids if sid in schedules]
         
-        # Get subjects for this teacher (inverse mapping)
+        # Get subjects for this teacher from class_allocations
         teacher_subject_objs = []
-        for subject_id, teacher_ids in subject_teachers_map.items():
-            if teacher_id in teacher_ids:
-                subject_id_int = int(subject_id)
-                if subject_id_int in subjects:
-                    teacher_subject_objs.append(subjects[subject_id_int])
+        teacher_subject_ids = set()
+        for allocation in data.get("class_allocations", []):
+            if allocation["teacher_id"] == teacher_id:
+                subject_id = allocation["subject_id"]
+                if subject_id not in teacher_subject_ids and subject_id in subjects:
+                    teacher_subject_ids.add(subject_id)
+                    teacher_subject_objs.append(subjects[subject_id])
         
         teachers[teacher_id] = Teacher(
             id=teacher_id,
@@ -173,12 +173,6 @@ def parse_timetable_data(data: Dict[str, Any]) -> TimetableData:
             int(k): v for k, v in data["teacher_schedules"].items()
         }
     
-    subject_teachers = None
-    if "subject_teachers" in data:
-        subject_teachers = {
-            int(k): v for k, v in data["subject_teachers"].items()
-        }
-    
     return TimetableData(
         class_allocations=class_allocations,
         classrooms=classrooms,
@@ -186,7 +180,6 @@ def parse_timetable_data(data: Dict[str, Any]) -> TimetableData:
         class_groups=class_groups,
         schedules=schedules,
         teacher_schedules=teacher_schedules,
-        subject_teachers=subject_teachers
     )
 
 
